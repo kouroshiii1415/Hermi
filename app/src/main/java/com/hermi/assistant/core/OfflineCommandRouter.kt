@@ -12,7 +12,7 @@ import java.util.Locale
  */
 object OfflineCommandRouter {
 
-    fun handle(ctx: Context, input: String): String? {
+    fun handle(ctx: Context, input: String, brainConfigured: Boolean = false): String? {
         val text = input.trim().lowercase(Locale.US)
         if (text.isEmpty()) return null
 
@@ -124,7 +124,11 @@ object OfflineCommandRouter {
 
         // Hello
         if (Regex("^(hi|hello|hey|hey hermi)\\b").find(text) != null) {
-            return "Hey! I'm Hermi. I'm running in offline mode — connect a GLM brain in Settings for my full power."
+            return if (brainConfigured) {
+                "Hey! I'm here — what can I do for you?"
+            } else {
+                "Hey! I'm Hermi. I'm running in offline mode — connect a GLM brain in Settings for my full power."
+            }
         }
 
         return null

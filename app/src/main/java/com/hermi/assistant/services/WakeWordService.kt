@@ -211,7 +211,8 @@ class WakeWordService : Service() {
                     scheduleRestart(delay)
                 }
             },
-            preferOnDevice = true
+            preferOnDevice = true,
+            suppressBeeps = true
         )
     }
 

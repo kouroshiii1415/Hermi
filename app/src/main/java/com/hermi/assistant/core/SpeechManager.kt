@@ -2,8 +2,11 @@ package com.hermi.assistant.core
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -17,11 +20,18 @@ import java.util.Locale
  * v1.2: optional on-device recognizer (API 31+, fast & offline — ideal for
  * the wake word). If the on-device engine keeps failing (e.g. English model
  * not downloaded), it automatically falls back to the standard recognizer.
+ *
+ * v1.3:
+ *  - suppressBeeps: mutes the media stream during recognizer start/stop so
+ *    Google's "connect/disconnect" tones never play (the annoying bleep-bloop
+ *    in continuous wake-word listening).
+ *  - onRms(): live microphone loudness for the animated orb.
  */
 class SpeechManager(
     private val context: Context,
     private val callback: Callback,
-    private val preferOnDevice: Boolean = false
+    private val preferOnDevice: Boolean = false,
+    private val suppressBeeps: Boolean = false
 ) : RecognitionListener {
 
     interface Callback {
@@ -29,6 +39,8 @@ class SpeechManager(
         fun onPartial(text: String)
         fun onFinal(text: String)
         fun onError(message: String)
+        /** Live mic loudness in dB (about -2…10 while speaking). */
+        fun onRms(rmsdB: Float) {}
     }
 
     companion object {
@@ -50,6 +62,33 @@ class SpeechManager(
     private var usingOnDevice = false
     private var onDeviceHardFailures = 0
 
+    private val audio =
+        context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    private val handler = Handler(Looper.getMainLooper())
+    private var mutedByUs = false
+
+    // ---- beep suppression (v1.3) ----
+
+    private fun muteMedia() {
+        if (!suppressBeeps || mutedByUs) return
+        try {
+            audio?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0)
+            mutedByUs = true
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    private fun unmuteMedia() {
+        if (!mutedByUs) return
+        mutedByUs = false
+        try {
+            audio?.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_UNMUTE, 0)
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
     fun start() {
         stop()
         if (!isAvailable(context)) {
@@ -69,10 +108,12 @@ class SpeechManager(
                     context.packageName
                 )
             }
+            muteMedia() // hide the "ready" tone
             sr.startListening(intent)
             recognizer = sr
             callback.onStart()
         } catch (e: Exception) {
+            unmuteMedia()
             Log.e(TAG, "start failed", e)
             callback.onError("Could not start mic: ${e.message}")
         }
@@ -96,6 +137,7 @@ class SpeechManager(
     }
 
     fun stop() {
+        muteMedia() // hide the "end" tone too
         try {
             recognizer?.stopListening()
             recognizer?.destroy()
@@ -103,13 +145,24 @@ class SpeechManager(
             // ignore
         }
         recognizer = null
+        handler.removeCallbacks(unmuteRunnable)
+        handler.postDelayed(unmuteRunnable, 250)
     }
+
+    private val unmuteRunnable = Runnable { unmuteMedia() }
 
     // ---- RecognitionListener ----
 
-    override fun onReadyForSpeech(params: Bundle?) {}
+    override fun onReadyForSpeech(params: Bundle?) {
+        // the start tone has finished playing — restore audio
+        handler.removeCallbacks(unmuteRunnable)
+        handler.postDelayed(unmuteRunnable, 350)
+    }
+
     override fun onBeginningOfSpeech() {}
-    override fun onRmsChanged(rmsdB: Float) {}
+    override fun onRmsChanged(rmsdB: Float) {
+        callback.onRms(rmsdB)
+    }
     override fun onBufferReceived(buffer: ByteArray?) {}
     override fun onEndOfSpeech() {}
 

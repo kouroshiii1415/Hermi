@@ -58,14 +58,25 @@ object TtsManager {
     private fun selectVoice() {
         try {
             val voices = tts?.voices ?: return
-            val us = voices.filter { it.locale.language == "en" }
-            val female = us.firstOrNull {
-                it.name.contains("female", ignoreCase = true) ||
-                    listOf("samantha", "victoria", "karen", "serena", "zira", "susan")
-                        .any { n -> it.name.contains(n, true) }
+            val en = voices.filter { it.locale.language == "en" }
+            if (en.isEmpty()) return
+
+            // v1.3 voice-quality ranking — Siri-level clarity:
+            //  1) Google "network" neural voices (best quality, needs internet)
+            //  2) known female voices
+            //  3) any en-US, then any English
+            val network = en.filter { it.name.contains("network", ignoreCase = true) }
+            val female = en.firstOrNull { v ->
+                v.name.contains("female", ignoreCase = true) ||
+                    listOf("samantha", "victoria", "karen", "serena", "zira", "susan", "aria", "jenny")
+                        .any { n -> v.name.contains(n, true) }
             }
-            if (female != null) tts?.voice = female
-            else if (us.isNotEmpty()) tts?.voice = us.first()
+            val chosen = network.firstOrNull { it.locale.country == "US" }
+                ?: network.firstOrNull()
+                ?: female
+                ?: en.firstOrNull { it.locale.country == "US" }
+                ?: en.first()
+            tts?.voice = chosen
         } catch (e: Exception) {
             Log.w(TAG, "voice select failed", e)
         }

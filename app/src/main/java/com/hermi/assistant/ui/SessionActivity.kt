@@ -12,8 +12,9 @@ import com.hermi.assistant.core.SpeechManager
 import com.hermi.assistant.core.TtsManager
 
 /**
- * Full-screen translucent voice session, launched by the wake-word service.
- * Listens → thinks → acts → speaks → dismisses.
+ * Full-screen Siri-style voice session, launched by the wake-word service.
+ * Animated orb + transcript → thinks → acts → speaks → dismisses.
+ * v1.3: Siri-like overlay UI with live mic-reactive orb.
  */
 class SessionActivity : AppCompatActivity() {
 
@@ -21,6 +22,7 @@ class SessionActivity : AppCompatActivity() {
     private var statusText: TextView? = null
     private var transcriptText: TextView? = null
     private var replyText: TextView? = null
+    private var orb: OrbView? = null
     private var speech: SpeechManager? = null
     private var processing = false
     private var finished = false
@@ -33,6 +35,10 @@ class SessionActivity : AppCompatActivity() {
         statusText = findViewById(R.id.txtSessionStatus)
         transcriptText = findViewById(R.id.txtSessionTranscript)
         replyText = findViewById(R.id.txtSessionReply)
+        orb = findViewById(R.id.orb)
+
+        // tap anywhere to dismiss
+        findViewById<android.view.View>(R.id.sessionRoot).setOnClickListener { finishIt() }
 
         // safety: auto-dismiss after 90s
         handler.postDelayed({ finishIt() }, 90_000)
@@ -40,6 +46,9 @@ class SessionActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        orb?.start()
+        setOrbState(OrbView.STATE_LISTENING)
+        statusText?.text = "LISTENING"
         handler.postDelayed({ startListening() }, 400)
     }
 
@@ -48,10 +57,19 @@ class SessionActivity : AppCompatActivity() {
         speech?.stop()
     }
 
+    override fun finish() {
+        super.finish()
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+    }
+
     private fun startListening() {
         speech?.stop()
         speech = SpeechManager(this, object : SpeechManager.Callback {
             override fun onStart() {}
+
+            override fun onRms(rmsdB: Float) {
+                orb?.onRms(rmsdB)
+            }
 
             override fun onPartial(text: String) {
                 transcriptText?.text = text
@@ -61,7 +79,8 @@ class SessionActivity : AppCompatActivity() {
                 if (processing) return
                 processing = true
                 transcriptText?.text = text
-                statusText?.text = "Thinking…"
+                statusText?.text = "THINKING"
+                setOrbState(OrbView.STATE_THINKING)
                 handleInput(text)
             }
 
@@ -69,7 +88,8 @@ class SessionActivity : AppCompatActivity() {
                 if (processing) {
                     return
                 }
-                statusText?.text = message
+                statusText?.text = "LISTENING"
+                setOrbState(OrbView.STATE_LISTENING)
                 handler.postDelayed({ finishIt() }, 1400)
             }
         })
@@ -79,20 +99,22 @@ class SessionActivity : AppCompatActivity() {
     private fun handleInput(text: String) {
         BrainEngine.process(this, text, object : BrainEngine.Callback {
             override fun onStatus(status: String) {
-                statusText?.text = status
+                statusText?.text = status.uppercase()
             }
 
             override fun onReply(text: String) {
-                statusText?.text = "Hermi"
+                statusText?.text = "HERMI"
                 replyText?.text = text
+                setOrbState(OrbView.STATE_SPEAKING)
                 TtsManager.speak(this@SessionActivity, text) {
                     handler.postDelayed({ finishIt() }, 2200)
                 }
             }
 
             override fun onError(message: String) {
-                statusText?.text = "Error"
+                statusText?.text = "ERROR"
                 replyText?.text = message
+                setOrbState(OrbView.STATE_IDLE)
                 TtsManager.speak(this@SessionActivity, "Sorry, something went wrong.") {
                     handler.postDelayed({ finishIt() }, 1800)
                 }
@@ -100,18 +122,24 @@ class SessionActivity : AppCompatActivity() {
         })
     }
 
+    private fun setOrbState(state: Int) {
+        orb?.setOrbState(state)
+    }
+
     private fun finishIt() {
         if (finished) return
         finished = true
         speech?.stop()
+        orb?.stop()
         finish()
-        overridePendingTransition(0, 0)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         speech?.stop()
         speech = null
+        orb?.stop()
+        orb = null
         handler.removeCallbacksAndMessages(null)
     }
 }
