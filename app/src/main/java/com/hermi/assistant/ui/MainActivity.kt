@@ -1,6 +1,7 @@
 package com.hermi.assistant.ui
 
 import android.Manifest
+import android.app.role.RoleManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -46,6 +47,14 @@ class MainActivity : AppCompatActivity() {
             refreshStatus()
         }
 
+    private val assistantRoleLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                Toast.makeText(this, "Hermi is now your assistant! 🎉", Toast.LENGTH_LONG).show()
+            }
+            refreshStatus()
+        }
+
     private val overlayLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             refreshStatus()
@@ -82,11 +91,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<MaterialButton>(R.id.btnSetAssistant).setOnClickListener {
-            try {
-                assistantLauncher.launch(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
-            } catch (e: Exception) {
-                Toast.makeText(this, "Open Settings → Apps → Default apps → Digital assistant app", Toast.LENGTH_LONG).show()
-            }
+            requestAssistantRole()
         }
 
         findViewById<MaterialButton>(R.id.btnOverlay).setOnClickListener {
@@ -177,11 +182,64 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun isDefaultAssistant(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val rm = getSystemService(RoleManager::class.java)
+                rm?.isRoleHeld(RoleManager.ROLE_ASSISTANT) ?: legacyAssistantCheck()
+            } catch (e: Exception) {
+                legacyAssistantCheck()
+            }
+        } else {
+            legacyAssistantCheck()
+        }
+    }
+
+    private fun legacyAssistantCheck(): Boolean {
         return try {
             val setting = Settings.Secure.getString(contentResolver, "voice_interaction_service")
             setting?.contains(packageName) == true
         } catch (e: Exception) {
             false
+        }
+    }
+
+    /**
+     * Best way to become the default assistant: the system Role dialog
+     * ("Set Hermi as your assistant?" — one tap). Falls back to the
+     * default-apps settings screens on older/quirky devices.
+     */
+    private fun requestAssistantRole() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val rm = getSystemService(RoleManager::class.java)
+                if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_ASSISTANT)) {
+                    if (rm.isRoleHeld(RoleManager.ROLE_ASSISTANT)) {
+                        Toast.makeText(this, "Hermi is already your assistant ✅", Toast.LENGTH_SHORT).show()
+                        return
+                    }
+                    assistantRoleLauncher.launch(rm.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT))
+                    return
+                }
+            } catch (e: Exception) {
+                // fall through to settings screens
+            }
+        }
+        // Fallback 1: assist & voice input settings
+        try {
+            assistantLauncher.launch(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+            return
+        } catch (e: Exception) {
+            // ignore
+        }
+        // Fallback 2: general default apps
+        try {
+            assistantLauncher.launch(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                "Open Settings → Apps → Default apps → Digital assistant app → Hermi",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 }
