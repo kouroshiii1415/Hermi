@@ -1,0 +1,11 @@
+<resources>
+    <color name="hermi_primary">#8B5CF6</color>
+    <color name="hermi_primary_dark">#6D28D9</color>
+    <color name="hermi_bg">#141218</color>
+    <color name="hermi_surface">#1E1B24</color>
+    <color name="hermi_text">#EDE9F5</color>
+    <color name="hermi_text_dim">#9B93AD</color>
+    <color name="hermi_accent">#34D399</color>
+    <color name="hermi_danger">#F87171</color>
+    <color name="launcher_bg">#1E1B2E</color>
+</resources>

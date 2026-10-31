@@ -1,0 +1,23 @@
+<resources>
+    <style name="Theme.Hermi" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/hermi_primary</item>
+        <item name="colorOnPrimary">@color/hermi_text</item>
+        <item name="colorPrimaryDark">@color/hermi_primary_dark</item>
+        <item name="colorSecondary">@color/hermi_accent</item>
+        <item name="android:colorBackground">@color/hermi_bg</item>
+        <item name="colorSurface">@color/hermi_surface</item>
+        <item name="colorOnSurface">@color/hermi_text</item>
+        <item name="colorOnSurfaceVariant">@color/hermi_text_dim</item>
+        <item name="android:statusBarColor">@color/hermi_bg</item>
+        <item name="android:navigationBarColor">@color/hermi_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.Hermi.Translucent">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>
