@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">Hermi</string>
     <string name="wake_notif_title">Hermi is listening</string>
-    <string name="wake_notif_text">Say \"Hey Hermi\" anytime · tap to stop</string>
+    <string name="wake_notif_text">Say \"Hey Hermi\" anytime · tap to manage</string>
+    <string name="wake_fallback_title">Hermi heard you 👋</string>
+    <string name="wake_fallback_text">Tap to open Hermi and continue</string>
 </resources>

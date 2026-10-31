@@ -115,21 +115,30 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
-        swWakeWord.setOnCheckedChangeListener { _, checked ->
-            Prefs.wakeWordEnabled = checked
-            if (checked) {
-                val missing = missingCorePerms()
-                if (missing.isNotEmpty()) {
-                    Toast.makeText(this, "Grant microphone permission first", Toast.LENGTH_SHORT).show()
-                    swWakeWord.isChecked = false
-                    Prefs.wakeWordEnabled = false
-                    return@setOnCheckedChangeListener
-                }
-                WakeWordService.start(this)
-                Toast.makeText(this, "Say “Hey Hermi” anytime ✨", Toast.LENGTH_SHORT).show()
-            } else {
-                WakeWordService.stop(this)
-            }
+        swWakeWord.setOnCheckedChangeListener { _, checked -> setWakeWord(checked) }
+    }
+
+    private fun setWakeWord(enabled: Boolean) {
+        Prefs.wakeWordEnabled = enabled
+        if (!enabled) {
+            WakeWordService.stop(this)
+            return
+        }
+        if (missingCorePerms().isNotEmpty()) {
+            Toast.makeText(this, "Grant microphone permission first", Toast.LENGTH_SHORT).show()
+            swWakeWord.isChecked = false
+            Prefs.wakeWordEnabled = false
+            return
+        }
+        WakeWordService.start(this)
+        if (!Settings.canDrawOverlays(this) && !isDefaultAssistant()) {
+            Toast.makeText(
+                this,
+                "Tip: allow “Display over other apps” or set Hermi as assistant, so the popup can appear when you say “Hey Hermi”",
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            Toast.makeText(this, "Say “Hey Hermi” anytime ✨", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -140,20 +149,7 @@ class MainActivity : AppCompatActivity() {
         val running = WakeWordService.isRunning
         swWakeWord.setOnCheckedChangeListener(null)
         swWakeWord.isChecked = running || Prefs.wakeWordEnabled
-        swWakeWord.setOnCheckedChangeListener { _, checked ->
-            Prefs.wakeWordEnabled = checked
-            if (checked) {
-                if (missingCorePerms().isNotEmpty()) {
-                    Toast.makeText(this, "Grant microphone permission first", Toast.LENGTH_SHORT).show()
-                    swWakeWord.isChecked = false
-                    Prefs.wakeWordEnabled = false
-                } else {
-                    WakeWordService.start(this)
-                }
-            } else {
-                WakeWordService.stop(this)
-            }
-        }
+        swWakeWord.setOnCheckedChangeListener { _, checked -> setWakeWord(checked) }
     }
 
     private fun missingCorePerms(): List<String> = corePerms.filter {
